@@ -1,0 +1,94 @@
+---
+author: "Sander van Kuijk"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+bibliography: references.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Date: `r Sys.Date()`.
+
+## Background
+
+There are many online references available for R Markdown. One of the books that can be bought but is also freely available on the web is the R Markdown Cookbook by Yihui Xie et al. You can find it here: <https://bookdown.org/yihui/rmarkdown-cookbook/>\
+The markdown language ignores 'enter'. To start a new line, het space twice (that's what I did just after the link to the book). Plain text could be placed here to introduce the report that you're making. For this tutorial, we will focus on the results section, as this shows best the integration between R code and text. Text can easily be made **bold**, *italic*, or, when you explicitly want to refer to R code but without actually invoking R you can use `mean()`. If you'd like to throw some maths into the mix, you can write simple expressions inline as $\sum_{i=1}^{n}x_i$, or where they are easier tor read: $$\sum_{i=1}^{n}x_i$$ As you can see, this is just an easy formula, but expand as you like!
+
+```{r, echo = FALSE}
+d <- read.csv("chronic_pain.csv", header = TRUE, sep = ";")
+```
+
+## Results
+
+The data are read from a comma separated values file (.csv file) created from an SPSS-file that contains the raw data. The data are a subset of a large cohort from the Maastricht UMC+. [@Brouwer2020-ic] These data will be used to perform some simple statistical analyses, the results of which will be integrated in this report. First, let's make an excerpt of the data visible in the report. For instance, let's present the first 5 rows of data.
+
+```{r, echo = FALSE, comment = ""}
+head(d, 5, row.names = FALSE)
+```
+
+This may be useful in a report, but it would require knowledge of column names and hence, some sort of a codebook. A better option would be to summarize the dataset using descriptive statistics.
+
+### Descriptive statistics
+
+For the actual results of analyses, naturally we would start with descriptive statistics. The cohort consisted of `r length(d$ID)` chronic pain patients. Of all patients, `r sum(d$Sex == 1, na.rm = TRUE)` (`r round(sum(d$Sex == 1, na.rm = TRUE)/length(d$ID)*100, 1)`%) were male, with an average age (standard deviation) of `r round(mean(d$Age, na.rm = TRUE), 2)` (`r round(sd(d$Age, na.rm = TRUE), 2)`). In case we had many more characteristics, a baseline table would be a better option:
+
+| Characteristic |                                           Total cohort                                            |
+|----------------|:-------------------------------------------------------------------------------------------------:|
+| Age (years)    |          `r round(mean(d$Age, na.rm = TRUE), 2)` (`r round(sd(d$Age, na.rm = TRUE), 2)`)          |
+| Sex (male)     | `r sum(d$Sex == 1, na.rm = TRUE)` (`r round(sum(d$Sex == 1, na.rm = TRUE)/length(d$ID)*100, 1)`%) |
+
+: Baseline characteristics
+
+We could have reported on the actual number of patients in the title, as a teaser for the intended reader. To do so, we can specify part of the YAML metadata here. this makes sure that in cse the dataset is updated (or we apply different eligibility criteria), the title is automatically updated as well.
+
+---
+title: "Using RMarkdown to report data of `r length(d$ID)` chronic pain patients"
+---
+
+Say we were most interested in a simple association between complaints of anxiety and depression in these patients. We could compute the correlation by simply typing `r round(cor.test(d$Hadssc_a, d$Hadssc_d)$estimate, 2)` with its associated p-value of *p*=`r round(cor.test(d$Hadssc_a, d$Hadssc_d)$p.value, 3)`. However, this is just a measure of the strength of the linear relation between these two variables. this may obscure a more interesting association.
+
+To get a better impression of the association between two continuous variables, a figure in the report would benefit the reader.
+
+```{r, echo = FALSE, fig.cap="Scatter of anxiety and depression scores"}
+plot(jitter(d$Hadssc_a), jitter(d$Hadssc_d),
+     xlab = "HADS Anxiety",
+     ylab = "HADS Depression", col =  "red", cex = .6)
+abline(lm(d$Hadssc_d ~ d$Hadssc_a), lty = 2, lwd = 2)
+```
+
+### Regression model
+
+Using RMarkdown, you can easily print how regression models were built. Say we would be interested to see whether there is an association between a number of baseline characteristics (e.g., sex, age, having a partner, and having one or more children) and depressive complaints. Before showing the actual results in a table, providing the regression model structure can be a lot of insight:
+
+```{r, echo = FALSE}
+library(equatiomatic)
+fit <- lm(Hadssc_d ~ Sex + Age + Partner + Child, data = d)
+extract_eq(fit)
+```
+
+As you can see, this is only the theoretical model, containing the structure, but no estimated regression coefficients yet. We can do this as follows:
+
+```{r, echo = FALSE}
+fit <- lm(Hadssc_d ~ Sex + Age + Partner + Child, data = d)
+extract_eq(fit, use_coefs = TRUE)
+```
+
+Note that the residual term in the model formula ($\epsilon$) is now omitted, and the outcome variable now has a roof over its head, denoting that this is someone's estimated HADS depression score can be calculated according to the formula. However, this is not the usual way to present results from a regression model (we have no confidence intervals, for instance). For that, we could report results neatly in a table. Table 1 shows regression coefficients of the linear model.
+
+```{r, echo = FALSE, message = FALSE, results = 'asis'}
+library(stargazer)
+
+# stargazer(fit,  type = "html", title = "Table 1. Regression output",
+#           single.row = TRUE, ci = TRUE, report = "vcsp*", header = FALSE)
+
+stargazer(fit,  type = "latex", title = "Regression output",
+          single.row = TRUE, ci = TRUE, report = "vcsp*", header = FALSE)
+```
+
+That concludes the tutorial on how to work with R Markdown! For your group assignment, make sure to integrate R into your R Markdown file, so that everyhing that depends on the dataset is automatically updated in case something changes to the data.
+
+## References
